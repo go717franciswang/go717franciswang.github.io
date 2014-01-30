@@ -29,4 +29,4 @@ References:
 
 [lecture]: https://class.coursera.org/sjtuma153-001/lecture/89
 [Barnsley fern]: http://en.wikipedia.org/wiki/Barnsley_fern
-[implementation]: https://github.com/go717franciswang/shiny-bear
+[implementation]: https://github.com/go717franciswang/shiny-bear/blob/master/src-cljs/game_of_chaos/core.cljs
