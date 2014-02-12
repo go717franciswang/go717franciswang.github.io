@@ -1,4 +1,4 @@
 Development using Jekyll
 ```sh
-jekyll serve --watch # auto-compile and serve local site on port 4000
+jekyll serve --draft --watch # auto-compile and serve local site on port 4000
 ```
