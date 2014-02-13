@@ -1,7 +1,6 @@
 ---
 layout: post
 title:  "Ad injection with maching learning"
-# date:   2014-02-10 19:23:00
 categories: SEM
 ---
 
