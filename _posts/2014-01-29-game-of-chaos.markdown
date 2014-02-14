@@ -2,7 +2,9 @@
 layout: post
 title:  "Coursera, The Journey of Mathematics: Chaos Game"
 date:   2014-01-29 22:34:11
-categories: Mathematics, Clojure
+categories: 
+- Mathematics
+- Clojure
 ---
 
 Rules of this game:
