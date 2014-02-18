@@ -5,11 +5,40 @@ categories: Clojure
 ---
 
 Partial demo of basic functionalities of C2
+
 ## c2.util
 ### pretty-print
 ```clj
 (pp {:a 150 :b 300})
 ;; {:a 150, :b [:c :d]}
+```
+
+### bind!
+```clj
+(bind! "#mydiv" [:div#mydiv "test"])
+```
+```html
+<div id="mydiv"><div>test</div></div>
+```
+
+### bind! and unify
+```clj
+(bind! "#mydiv" [:div#mydiv (c2/unify ["test"] (fn [v] [:div v]))])
+```
+```html
+<div id="mydiv"><div>test</div></div>
+```
+
+### bind! and unify an atom
+```clj
+(let [data (atom [0])
+      random-update (fn []
+                      (let [r (rand)]
+                        (p (str r))
+                        (swap! data assoc 0 r)))
+      ]
+  (bind! "#mydiv" [:div#mydiv (c2/unify @data (fn [v] [:div v]))])
+  (interval 1000 (random-update)))
 ```
 
 ## c2.svg
