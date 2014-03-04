@@ -10,7 +10,7 @@ import ddf.minim.effects.*;
 Controller controller;
 
 void setup() {
-  size(800, 800, OPENGL);
+  size(800, 720, OPENGL);
   frameRate(50);
   noStroke();
   

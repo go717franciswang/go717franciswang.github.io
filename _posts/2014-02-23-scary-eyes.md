@@ -16,8 +16,10 @@ They will give you nightmares.
 * You may be wondering what is [Helix mode]?
 * Thanks to [Processing] enabled by [processing.js]
 * Coursera [lecture]: interactive sketch
+* [Source]
 
 [Helix mode]: https://www.google.com/search?q=helix+silver+eyes&source=lnms&tbm=isch&sa=X&ei=T7kKU7nEBeH4yAGygoHYDA&ved=0CAkQ_AUoAQ&biw=1680&bih=963
 [Processing]: http://processing.org/reference/
 [processing.js]: http://processingjs.org/reference/
 [lecture]: https://class.coursera.org/compartsprocessing-001/lecture/37
+[Source]: https://github.com/go717franciswang/glowing-octo-spice/tree/master/ps3
