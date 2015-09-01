@@ -19,7 +19,25 @@ See [source].
 <div>
   Your Name: <input type="text" id="myname"/>
 </div>
-<div id="log"></div>
+<table>
+  <tr>
+    <th>
+      Members
+    </th>
+    <th>
+      Message Log
+    </th>
+  </tr>
+  <tr>
+    <td style="vertical-align: top">
+      <div id="members">
+      </div>
+    </td>
+    <td>
+      <div id="log"></div>
+    </td>
+  </tr>
+</table>
 <div>
   <input type="text" id="message"/><button id="sendButton" disabled>Send</button>
 </div>
