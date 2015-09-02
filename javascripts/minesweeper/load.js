@@ -3,7 +3,7 @@ var loadState = {
         game.scale.pageAlignHorizontally = true;
 
         game.load.spritesheet('tile', '/resources/minesweeper/tiles.png', 10, 10, 15);
-        game.load.spritesheet('face', '/resources/minesweeper/faces.png', 20, 20, 3);
+        game.load.spritesheet('face', '/resources/minesweeper/faces.png', 20, 20, 4);
         game.load.image('wrench', '/resources/minesweeper/wrench.png', 20, 20);
         game.load.image('trophy', '/resources/minesweeper/trophy.png', 20, 20);
         game.load.image('back-arrow', '/resources/minesweeper/back-arrow.png', 20, 20);

@@ -110,6 +110,11 @@ var playState = {
                     return function(sprite, pointer) {
                         if (gameOver) return;
 
+                        // make sure it's within the same tile
+                        var p1 = pointer.position;
+                        var p2 = tile.sprite.worldPosition;
+                        if (p1.x < p2.x || p1.x > p2.x+30 || p1.y < p2.y || p1.y > p2.y+30) return;
+
                         curClickTime = this.input.mouse.event.timeStamp;
 
                         var doubleClicked = false;
@@ -210,6 +215,12 @@ var playState = {
             }
 
             textMinesLeft.text = mineCount - flaggedCount;
+        }
+
+        if (game.input.activePointer.leftButton.isDown) {
+            face.frame = 3;
+        } else {
+            face.frame = 0;
         }
     },
 
