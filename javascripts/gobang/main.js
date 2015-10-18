@@ -35,9 +35,10 @@ var GobangOnline;
             this.load.image('menu', '/resources/gobang/menu.jpg');
             this.load.image('singlePlayerButton', '/resources/gobang/Play-button.gif');
             this.load.image('button', '/resources/gobang/blue-button-hi.png');
-            this.load.image('board', '/resources/gobang/board.jpg');
-            this.load.spritesheet('piece', '/resources/gobang/pieces.png', 289, 289, 2);
+            this.load.image('board', '/resources/gobang/board.png');
+            this.load.spritesheet('piece', '/resources/gobang/pieces.png', 100, 100, 2);
             this.load.bitmapFont('Castaway', '/resources/gobang/fonts/Castaway.png', '/resources/gobang/fonts/Castaway.xml');
+            this.stage.smoothed = false;
         };
         Preloader.prototype.create = function () {
             var tween = this.add.tween(this.preloadBar).to({ alpha: 0 }, 1000, Phaser.Easing.Linear.None, true);
@@ -140,6 +141,12 @@ var GobangOnline;
                 }
             }
         }
+        Board.prototype.getMoveAt = function (id) {
+            return this.moveLog[id];
+        };
+        Board.prototype.getMoveCount = function () {
+            return this.moveLog.length;
+        };
         Board.prototype.colorAt = function (move) {
             return this.table[move.row][move.column];
         };
@@ -185,15 +192,19 @@ var GobangOnline;
             this.gameOver = false;
             this.board = new GobangOnline.Board(size);
             if (Math.floor(Math.random() * 2) == 0) {
+                console.log('player 1\'s turn');
                 this.pendingPlayer = player1;
                 this.nonPendingPlayer = player2;
             }
             else {
+                console.log('player 2\'s turn');
                 this.nonPendingPlayer = player1;
                 this.pendingPlayer = player2;
             }
             this.pendingPlayer.setColor(GobangOnline.Color.Black);
             this.nonPendingPlayer.setColor(GobangOnline.Color.White);
+            this.blackPlayer = this.pendingPlayer;
+            this.whitePlayer = this.nonPendingPlayer;
         }
         Gobang.prototype.startGame = function () {
             this.pendingPlayer.takeTurn(this, null);
@@ -214,10 +225,16 @@ var GobangOnline;
                 this.gameOver = true;
                 player.win();
                 this.nonPendingPlayer.lose();
+                if (this.onGameOver) {
+                    this.onGameOver();
+                }
+                return;
             }
             this.swapPlayingPendingState();
             this.pendingPlayer.takeTurn(this, move);
-            this.onRegisterMove(player, move);
+            if (this.onRegisterMove) {
+                this.onRegisterMove(player, move);
+            }
         };
         Gobang.prototype.swapPlayingPendingState = function () {
             var tmp = this.pendingPlayer;
@@ -295,6 +312,35 @@ var GobangOnline;
         return Gobang;
     })();
     GobangOnline.Gobang = Gobang;
+})(GobangOnline || (GobangOnline = {}));
+var GobangOnline;
+(function (GobangOnline) {
+    var HumanPlayer = (function () {
+        function HumanPlayer() {
+            this.takingTurn = false;
+        }
+        HumanPlayer.prototype.setColor = function (color) {
+            this.color = color;
+        };
+        HumanPlayer.prototype.takeTurn = function (context, lastMove) {
+            this.takingTurn = true;
+            this.context = context;
+        };
+        HumanPlayer.prototype.makeMove = function (move) {
+            this.takingTurn = false;
+            this.context.registerMove(this, move);
+        };
+        HumanPlayer.prototype.badMove = function (context, badMove) {
+        };
+        HumanPlayer.prototype.win = function () {
+            this.onWinCallback();
+        };
+        HumanPlayer.prototype.lose = function () {
+            this.onLossCallback();
+        };
+        return HumanPlayer;
+    })();
+    GobangOnline.HumanPlayer = HumanPlayer;
 })(GobangOnline || (GobangOnline = {}));
 var GobangOnline;
 (function (GobangOnline) {
@@ -486,35 +532,6 @@ var GobangOnline;
 })(GobangOnline || (GobangOnline = {}));
 var GobangOnline;
 (function (GobangOnline) {
-    var HumanPlayer = (function () {
-        function HumanPlayer() {
-            this.takingTurn = false;
-        }
-        HumanPlayer.prototype.setColor = function (color) {
-            this.color = color;
-        };
-        HumanPlayer.prototype.takeTurn = function (context, lastMove) {
-            this.takingTurn = true;
-            this.context = context;
-        };
-        HumanPlayer.prototype.makeMove = function (move) {
-            this.takingTurn = false;
-            this.context.registerMove(this, move);
-        };
-        HumanPlayer.prototype.badMove = function (context, badMove) {
-        };
-        HumanPlayer.prototype.win = function () {
-            this.onWinCallback();
-        };
-        HumanPlayer.prototype.lose = function () {
-            this.onLossCallback();
-        };
-        return HumanPlayer;
-    })();
-    GobangOnline.HumanPlayer = HumanPlayer;
-})(GobangOnline || (GobangOnline = {}));
-var GobangOnline;
-(function (GobangOnline) {
     var AiPlayer = (function () {
         function AiPlayer(depth, maxCandidates) {
             this.depth = depth;
@@ -619,6 +636,19 @@ var GobangOnline;
 })(GobangOnline || (GobangOnline = {}));
 var GobangOnline;
 (function (GobangOnline) {
+    GobangOnline.Settings = {
+        API_KEY: 'swe48rh5c9l1h5mi',
+        ROOMID: 'server',
+        BOARD_SIZE: 19,
+        MAX_WAIT_PER_MOVE: 10,
+        BOARD_X_START: 128 - 9,
+        BOARD_Y_START: 26 - 9,
+        BOARD_X_END: 689 - 9,
+        BOARD_Y_END: 590 - 9,
+    };
+})(GobangOnline || (GobangOnline = {}));
+var GobangOnline;
+(function (GobangOnline) {
     var SinglePlayer = (function (_super) {
         __extends(SinglePlayer, _super);
         function SinglePlayer() {
@@ -646,7 +676,7 @@ var GobangOnline;
                 msg.anchor.setTo(0.5, 0.5);
             };
             this.aiPlayer = new GobangOnline.AiPlayer(this.aiDepth, 100);
-            this.engine = new GobangOnline.Gobang(16, this.humanPlayer, this.aiPlayer);
+            this.engine = new GobangOnline.Gobang(GobangOnline.Settings.BOARD_SIZE, this.humanPlayer, this.aiPlayer);
             this.engine.setOnRegisterMove(function (player, move) {
                 var pos = _this.move2position(move);
                 var piece = _this.add.sprite(pos.x, pos.y, 'piece');
@@ -654,21 +684,21 @@ var GobangOnline;
                     piece.frame = 1;
                 }
                 piece.anchor.setTo(0.5, 0.5);
-                piece.scale.setTo(0.12);
+                piece.scale.setTo(30 / piece.width);
                 _this.stageGroup.add(piece);
             });
             this.engine.startGame();
         };
         SinglePlayer.prototype.move2position = function (move) {
             return {
-                x: move.column * 525 / 15 + 135,
-                y: move.row * 525 / 15 + 35
+                x: move.column * (GobangOnline.Settings.BOARD_X_END - GobangOnline.Settings.BOARD_X_START) / (GobangOnline.Settings.BOARD_SIZE - 1) + GobangOnline.Settings.BOARD_X_START,
+                y: move.row * (GobangOnline.Settings.BOARD_Y_END - GobangOnline.Settings.BOARD_Y_START) / (GobangOnline.Settings.BOARD_SIZE - 1) + GobangOnline.Settings.BOARD_Y_START
             };
         };
         SinglePlayer.prototype.position2move = function (position) {
             return {
-                row: Math.round((position.y - 35) / (525 / 15)),
-                column: Math.round((position.x - 135) / (525 / 15))
+                row: Math.round((position.y - GobangOnline.Settings.BOARD_Y_START) / ((GobangOnline.Settings.BOARD_Y_END - GobangOnline.Settings.BOARD_Y_START) / (GobangOnline.Settings.BOARD_SIZE - 1))),
+                column: Math.round((position.x - GobangOnline.Settings.BOARD_X_START) / ((GobangOnline.Settings.BOARD_X_END - GobangOnline.Settings.BOARD_X_START) / (GobangOnline.Settings.BOARD_SIZE - 1)))
             };
         };
         SinglePlayer.prototype.update = function () {
@@ -722,22 +752,252 @@ var GobangOnline;
 })(GobangOnline || (GobangOnline = {}));
 var GobangOnline;
 (function (GobangOnline) {
+    (function (MsgType) {
+        MsgType[MsgType["TakeTurn"] = 0] = "TakeTurn";
+        MsgType[MsgType["Move"] = 1] = "Move";
+        MsgType[MsgType["GameOver"] = 2] = "GameOver";
+        MsgType[MsgType["NewPlayer"] = 3] = "NewPlayer";
+        MsgType[MsgType["PopupText"] = 4] = "PopupText";
+    })(GobangOnline.MsgType || (GobangOnline.MsgType = {}));
+    var MsgType = GobangOnline.MsgType;
+    ;
+})(GobangOnline || (GobangOnline = {}));
+var GobangOnline;
+(function (GobangOnline) {
+    var RemotePlayer = (function () {
+        function RemotePlayer(conn) {
+            this.conn = conn;
+        }
+        RemotePlayer.prototype.send = function (msg) {
+            this.conn.send(msg);
+        };
+        RemotePlayer.prototype.setColor = function (color) {
+            this.color = color;
+        };
+        RemotePlayer.prototype.takeTurn = function (context, lastMove) {
+            this.context = context;
+            this.conn.send({ type: GobangOnline.MsgType.TakeTurn, lastMove: lastMove });
+            this.onTakeTurnCallback(this.context.board.getMoveCount());
+        };
+        RemotePlayer.prototype.makeMove = function (move) {
+            this.context.registerMove(this, move);
+        };
+        RemotePlayer.prototype.badMove = function (context, badMove) {
+        };
+        RemotePlayer.prototype.win = function () {
+        };
+        RemotePlayer.prototype.lose = function () {
+        };
+        return RemotePlayer;
+    })();
+    GobangOnline.RemotePlayer = RemotePlayer;
+})(GobangOnline || (GobangOnline = {}));
+var GobangOnline;
+(function (GobangOnline) {
     var MultiPlayer = (function (_super) {
         __extends(MultiPlayer, _super);
         function MultiPlayer() {
             _super.apply(this, arguments);
+            this.takingTurn = false;
         }
         MultiPlayer.prototype.create = function () {
+            this.board = this.add.sprite(this.game.width / 2, this.game.height / 2, 'board');
+            this.board.anchor.setTo(0.5, 0.5);
+            var scale = this.game.height / this.board.height;
+            this.board.scale.setTo(scale, scale);
             this.createServerIfNotExist();
+            this.localBoard = new GobangOnline.Board(GobangOnline.Settings.BOARD_SIZE);
         };
         MultiPlayer.prototype.createServerIfNotExist = function () {
-            this.server = new Peer('server', { key: 'swe48rh5c9l1h5mi' });
+            var _this = this;
+            this.server = new Peer(GobangOnline.Settings.ROOMID, { key: GobangOnline.Settings.API_KEY });
             this.server.on('error', function (e) {
                 console.log(e);
+                if (e.toString().match(/ID.*is taken/)) {
+                    _this.createClient();
+                }
             });
             this.server.on('open', function () {
+                _this.connToClients = [];
                 console.log('server created!');
+                _this.createClient();
+                _this.server.on('connection', function (conn) {
+                    console.log('someone joined');
+                    _this.connToClients.push(conn);
+                    _this.handleConnectionToClient(conn);
+                    if (_this.connToClients.length == 2) {
+                        console.log('got enough players');
+                        console.log('game start in 1 second');
+                        setTimeout(function () {
+                            _this.remotePlayer1 = new GobangOnline.RemotePlayer(_this.connToClients[0]);
+                            _this.remotePlayer2 = new GobangOnline.RemotePlayer(_this.connToClients[1]);
+                            _this.engine = new GobangOnline.Gobang(GobangOnline.Settings.BOARD_SIZE, _this.remotePlayer1, _this.remotePlayer2);
+                            _this.engine.blackPlayer.send({ type: GobangOnline.MsgType.PopupText, text: 'GAME BEGAN\nYOU ARE BLACK' });
+                            _this.engine.whitePlayer.send({ type: GobangOnline.MsgType.PopupText, text: 'GAME BEGAN\nYOU ARE WHITE' });
+                            _this.engine.blackPlayer.onTakeTurnCallback = function (moveCountBeforeTurn) {
+                                setTimeout(function () {
+                                    if (moveCountBeforeTurn == _this.engine.board.getMoveCount()) {
+                                        _this.declareWinner(GobangOnline.Color.White);
+                                    }
+                                }, (GobangOnline.Settings.MAX_WAIT_PER_MOVE + 1) * 1000);
+                            };
+                            _this.engine.whitePlayer.onTakeTurnCallback = function (moveCountBeforeTurn) {
+                                setTimeout(function () {
+                                    if (moveCountBeforeTurn == _this.engine.board.getMoveCount()) {
+                                        _this.declareWinner(GobangOnline.Color.Black);
+                                    }
+                                }, (GobangOnline.Settings.MAX_WAIT_PER_MOVE + 1) * 1000);
+                            };
+                            _this.engine.startGame();
+                            _this.engine.onGameOver = function () {
+                                _this.declareWinner(_this.engine.pendingPlayer.color);
+                            };
+                        }, 1000);
+                    }
+                });
             });
+        };
+        MultiPlayer.prototype.declareWinner = function (winnerColor) {
+            var _this = this;
+            this.broadCast({ type: GobangOnline.MsgType.GameOver, winnerColor: winnerColor });
+            setTimeout(function () {
+                _this.server.destroy();
+            }, 1000);
+        };
+        MultiPlayer.prototype.broadCast = function (msg) {
+            this.connToClients.forEach(function (conn) {
+                conn.send(msg);
+            });
+        };
+        MultiPlayer.prototype.handleConnectionToClient = function (conn) {
+            var _this = this;
+            conn.on('open', function () {
+            });
+            conn.on('data', function (data) {
+                console.log('server got message: ', data);
+                switch (data.type) {
+                    case GobangOnline.MsgType.Move:
+                        var move = data.move;
+                        _this.broadCast({ type: GobangOnline.MsgType.Move, move: move, moveId: _this.engine.board.getMoveCount() });
+                        _this.engine.pendingPlayer.makeMove(move);
+                        break;
+                    case GobangOnline.MsgType.NewPlayer:
+                        if (_this.isFirstClient(conn)) {
+                            _this.connToClients[0].send({ type: GobangOnline.MsgType.PopupText, text: 'WAITING FOR ANOTHER PLAYER' });
+                        }
+                        else if (_this.isSecondClient(conn)) {
+                            _this.broadCast({ type: GobangOnline.MsgType.PopupText, text: 'GAME IS READY' });
+                        }
+                        else {
+                            _this.broadCast({ type: GobangOnline.MsgType.PopupText, text: 'AN OBSERVER HAS ENTERED' });
+                            setTimeout(function () {
+                                for (var i = 0; i < _this.engine.board.getMoveCount(); i++) {
+                                    conn.send({ type: GobangOnline.MsgType.Move, move: _this.engine.board.getMoveAt(i), moveId: i });
+                                }
+                            }, 1000);
+                        }
+                        break;
+                }
+            });
+        };
+        MultiPlayer.prototype.isFirstClient = function (conn) {
+            return conn.peer == this.connToClients[0].peer;
+        };
+        MultiPlayer.prototype.isSecondClient = function (conn) {
+            return conn.peer == this.connToClients[1].peer;
+        };
+        MultiPlayer.prototype.createClient = function () {
+            var _this = this;
+            this.client = new Peer({ key: GobangOnline.Settings.API_KEY });
+            this.client.on('error', function () {
+            });
+            this.client.on('open', function () {
+                _this.connToServer = _this.client.connect(GobangOnline.Settings.ROOMID, { reliable: true });
+                _this.connToServer.on('open', function () {
+                    _this.handleConnectionToServer();
+                    _this.client.disconnect();
+                    _this.connToServer.send({ type: GobangOnline.MsgType.NewPlayer });
+                });
+            });
+        };
+        MultiPlayer.prototype.handleConnectionToServer = function () {
+            var _this = this;
+            this.connToServer.on('error', function () {
+            });
+            this.connToServer.on('data', function (data) {
+                console.log('client got message: ', data);
+                switch (data.type) {
+                    case GobangOnline.MsgType.TakeTurn:
+                        _this.takingTurn = true;
+                        _this.turnBeganAt = (new Date()).getTime();
+                        var style = { font: "bold 32px Arial", fill: "#fff", boundsAlignH: "center", boundsAlignV: "middle" };
+                        _this.timer = _this.add.text(_this.game.width - 25, 0, GobangOnline.Settings.MAX_WAIT_PER_MOVE.toString(), style);
+                        _this.timer.anchor.setTo(1, 0);
+                        break;
+                    case GobangOnline.MsgType.Move:
+                        var move = data.move;
+                        var pos = _this.move2position(move);
+                        var piece = _this.add.sprite(pos.x, pos.y, 'piece');
+                        var blackTurn = data.moveId % 2 == 0;
+                        if (!blackTurn) {
+                            piece.frame = 1;
+                        }
+                        piece.anchor.setTo(0.5, 0.5);
+                        piece.scale.setTo(30 / piece.width);
+                        if (blackTurn) {
+                            _this.localBoard.setColorAt(move, GobangOnline.Color.Black);
+                        }
+                        else {
+                            _this.localBoard.setColorAt(move, GobangOnline.Color.White);
+                        }
+                        break;
+                    case GobangOnline.MsgType.GameOver:
+                        var txt = data.winnerColor == GobangOnline.Color.Black ? 'BLACK WINS' : 'WHITE WINS';
+                        var msg = _this.game.add.bitmapText(_this.game.width / 2, _this.game.height / 2, 'Castaway', txt);
+                        msg.anchor.setTo(0.5, 0.5);
+                        break;
+                    case GobangOnline.MsgType.PopupText:
+                        var msg = _this.game.add.bitmapText(_this.game.width / 2, _this.game.height / 2, 'Castaway', data.text);
+                        msg.anchor.setTo(0.5, 0.5);
+                        _this.add.tween(msg).to({ alpha: 0 }, 700, null, true, 1000);
+                        break;
+                }
+            });
+        };
+        MultiPlayer.prototype.update = function () {
+            if (this.takingTurn) {
+                var move = this.position2move(this.game.input.activePointer);
+                var secondsLeft = Math.max(0, GobangOnline.Settings.MAX_WAIT_PER_MOVE - Math.floor((new Date().getTime() - this.turnBeganAt) / 1000));
+                this.timer.setText(secondsLeft.toString());
+                if (this.game.input.activePointer.isDown) {
+                    if (this.localBoard.isMoveValid(move) && !this.pendingMove) {
+                        this.pendingMove = move;
+                    }
+                }
+                else {
+                    if (this.pendingMove && this.pendingMove.row == move.row && this.pendingMove.column == move.column) {
+                        this.connToServer.send({ type: GobangOnline.MsgType.Move, move: move });
+                        this.takingTurn = false;
+                    }
+                    this.pendingMove = null;
+                }
+            }
+            else if (this.timer) {
+                this.timer.destroy();
+                this.timer = null;
+            }
+        };
+        MultiPlayer.prototype.move2position = function (move) {
+            return {
+                x: move.column * (GobangOnline.Settings.BOARD_X_END - GobangOnline.Settings.BOARD_X_START) / (GobangOnline.Settings.BOARD_SIZE - 1) + GobangOnline.Settings.BOARD_X_START,
+                y: move.row * (GobangOnline.Settings.BOARD_Y_END - GobangOnline.Settings.BOARD_Y_START) / (GobangOnline.Settings.BOARD_SIZE - 1) + GobangOnline.Settings.BOARD_Y_START
+            };
+        };
+        MultiPlayer.prototype.position2move = function (position) {
+            return {
+                row: Math.round((position.y - GobangOnline.Settings.BOARD_Y_START) / ((GobangOnline.Settings.BOARD_Y_END - GobangOnline.Settings.BOARD_Y_START) / (GobangOnline.Settings.BOARD_SIZE - 1))),
+                column: Math.round((position.x - GobangOnline.Settings.BOARD_X_START) / ((GobangOnline.Settings.BOARD_X_END - GobangOnline.Settings.BOARD_X_START) / (GobangOnline.Settings.BOARD_SIZE - 1)))
+            };
         };
         return MultiPlayer;
     })(Phaser.State);
