@@ -38,6 +38,8 @@ var GobangOnline;
             this.load.image('board', '/resources/gobang/board.png');
             this.load.spritesheet('piece', '/resources/gobang/pieces.png', 100, 100, 2);
             this.load.bitmapFont('Castaway', '/resources/gobang/fonts/Castaway.png', '/resources/gobang/fonts/Castaway.xml');
+            this.load.audio('click', 'resources/gobang/click.mp3');
+            this.load.audio('beep', 'resources/gobang/beep.mp3');
             this.stage.smoothed = false;
         };
         Preloader.prototype.create = function () {
@@ -78,13 +80,13 @@ var GobangOnline;
             this.background.scale.y = this.game.height / this.background.height;
             this.add.tween(this.background).to({ alpha: 1.0 }, 2000, Phaser.Easing.Bounce.InOut, true);
             GobangOnline.addButton(this.game, this.game.width / 2, this.game.height / 2 - 150, 'EASY', function () {
-                _this.game.state.start('SinglePlayer', true, false, 1);
+                _this.game.state.start('SinglePlayer', true, false, 1, 100);
             });
             GobangOnline.addButton(this.game, this.game.width / 2, this.game.height / 2, 'MEDIUM', function () {
-                _this.game.state.start('SinglePlayer', true, false, 2);
+                _this.game.state.start('SinglePlayer', true, false, 2, 50);
             });
             GobangOnline.addButton(this.game, this.game.width / 2, this.game.height / 2 + 150, 'HARD', function () {
-                _this.game.state.start('SinglePlayer', true, false, 3);
+                _this.game.state.start('SinglePlayer', true, false, 3, 50);
             });
         };
         return DifficultyMenu;
@@ -129,23 +131,31 @@ var GobangOnline;
         return color == Color.Black ? Color.White : Color.Black;
     }
     GobangOnline.getOpponentColor = getOpponentColor;
+    function buildSquareMatrix(size, defaultValue) {
+        var matrix = [];
+        for (var i = 0; i < size; i++) {
+            matrix[i] = [];
+            for (var j = 0; j < size; j++) {
+                matrix[i][j] = defaultValue;
+            }
+        }
+        return matrix;
+    }
+    GobangOnline.buildSquareMatrix = buildSquareMatrix;
     var Board = (function () {
         function Board(size) {
             this.size = size;
-            this.table = [];
+            this.table = buildSquareMatrix(size, Color.Empty);
             this.moveLog = [];
-            for (var i = 0; i < size; i++) {
-                this.table[i] = [];
-                for (var j = 0; j < size; j++) {
-                    this.table[i][j] = Color.Empty;
-                }
-            }
         }
         Board.prototype.getMoveAt = function (id) {
             return this.moveLog[id];
         };
         Board.prototype.getMoveCount = function () {
             return this.moveLog.length;
+        };
+        Board.prototype.getLastMove = function () {
+            return this.moveLog[this.getMoveCount() - 1];
         };
         Board.prototype.colorAt = function (move) {
             return this.table[move.row][move.column];
@@ -174,6 +184,74 @@ var GobangOnline;
                     if (!(dx == 0 && dy == 0) && !this.isOutOfBound(neighbor) && this.colorAt(neighbor) != Color.Empty) {
                         return true;
                     }
+                }
+            }
+            return false;
+        };
+        Board.prototype.isGameOver = function (playerColor) {
+            var run;
+            for (var i = 0; i < this.size; i++) {
+                run = 0;
+                for (var j = 0; j < this.size; j++) {
+                    if (this.colorAt({ row: i, column: j }) == playerColor) {
+                        run++;
+                    }
+                    else {
+                        run = 0;
+                    }
+                    if (run == 5) {
+                        return true;
+                    }
+                }
+            }
+            for (var i = 0; i < this.size; i++) {
+                run = 0;
+                for (var j = 0; j < this.size; j++) {
+                    if (this.colorAt({ row: j, column: i }) == playerColor) {
+                        run++;
+                    }
+                    else {
+                        run = 0;
+                    }
+                    if (run == 5) {
+                        return true;
+                    }
+                }
+            }
+            for (var i = 0; i < (this.size - 4) * 2 - 1; i++) {
+                run = 0;
+                var r = Math.max(this.size - 5 - i, 0);
+                var c = Math.max(i - (this.size - 5), 0);
+                while (r < this.size && c < this.size) {
+                    if (this.colorAt({ row: r, column: c }) == playerColor) {
+                        run++;
+                    }
+                    else {
+                        run = 0;
+                    }
+                    if (run == 5) {
+                        return true;
+                    }
+                    r++;
+                    c++;
+                }
+            }
+            for (var i = 0; i < (this.size - 4) * 2 - 1; i++) {
+                run = 0;
+                var r = Math.min(i + 4, this.size - 1);
+                var c = Math.max(i - (this.size - 5), 0);
+                while (r >= 0 && c < this.size) {
+                    if (this.colorAt({ row: r, column: c }) == playerColor) {
+                        run++;
+                    }
+                    else {
+                        run = 0;
+                    }
+                    if (run == 5) {
+                        return true;
+                    }
+                    r--;
+                    c++;
                 }
             }
             return false;
@@ -242,72 +320,7 @@ var GobangOnline;
             this.nonPendingPlayer = tmp;
         };
         Gobang.prototype.isGameOver = function (checkPlayer) {
-            var run;
-            for (var i = 0; i < this.size; i++) {
-                run = 0;
-                for (var j = 0; j < this.size; j++) {
-                    if (this.board.colorAt({ row: i, column: j }) == checkPlayer.color) {
-                        run++;
-                    }
-                    else {
-                        run = 0;
-                    }
-                    if (run == 5) {
-                        return true;
-                    }
-                }
-            }
-            for (var i = 0; i < this.size; i++) {
-                run = 0;
-                for (var j = 0; j < this.size; j++) {
-                    if (this.board.colorAt({ row: j, column: i }) == checkPlayer.color) {
-                        run++;
-                    }
-                    else {
-                        run = 0;
-                    }
-                    if (run == 5) {
-                        return true;
-                    }
-                }
-            }
-            for (var i = 0; i < (this.size - 4) * 2 - 1; i++) {
-                run = 0;
-                var r = Math.max(this.size - 5 - i, 0);
-                var c = Math.max(i - (this.size - 5), 0);
-                while (r < this.size && c < this.size) {
-                    if (this.board.colorAt({ row: r, column: c }) == checkPlayer.color) {
-                        run++;
-                    }
-                    else {
-                        run = 0;
-                    }
-                    if (run == 5) {
-                        return true;
-                    }
-                    r++;
-                    c++;
-                }
-            }
-            for (var i = 0; i < (this.size - 4) * 2 - 1; i++) {
-                run = 0;
-                var r = Math.min(i + 4, this.size - 1);
-                var c = Math.max(i - (this.size - 5), 0);
-                while (r >= 0 && c < this.size) {
-                    if (this.board.colorAt({ row: r, column: c }) == checkPlayer.color) {
-                        run++;
-                    }
-                    else {
-                        run = 0;
-                    }
-                    if (run == 5) {
-                        return true;
-                    }
-                    r--;
-                    c++;
-                }
-            }
-            return false;
+            return this.board.isGameOver(checkPlayer.color);
         };
         return Gobang;
     })();
@@ -346,7 +359,7 @@ var GobangOnline;
 (function (GobangOnline) {
     GobangOnline.patternScore = [
         {
-            name: "长连",
+            name: "连五",
             patterns: [
                 "11111"
             ],
@@ -359,16 +372,16 @@ var GobangOnline;
                 "011110"
             ],
             score: 5000,
-            rivalScore: 3000
+            rivalScore: 2100
         },
         {
             name: "冲四",
             patterns: [
                 "011112",
-                "0101110",
-                "0110110"
+                "10111",
+                "11011"
             ],
-            score: 2100,
+            score: 2101,
             rivalScore: 1800
         },
         {
@@ -386,8 +399,8 @@ var GobangOnline;
                 "001112",
                 "010112",
                 "011012",
-                "10011",
-                "10101",
+                "0100110",
+                "0101010",
                 "2011102"
             ],
             score: 600,
@@ -396,7 +409,7 @@ var GobangOnline;
         {
             name: "活二",
             patterns: [
-                "00110",
+                "001100",
                 "01010",
                 "010010"
             ],
@@ -409,7 +422,7 @@ var GobangOnline;
                 "000112",
                 "001012",
                 "010012",
-                "10001",
+                "0100010",
                 "2010102",
                 "2011002"
             ],
@@ -417,6 +430,90 @@ var GobangOnline;
             rivalScore: 80
         },
     ];
+    var alternativeScore = [
+        {
+            "patternNames": { "连五": 1 },
+            "score": 100000
+        },
+        {
+            "patternNames": { "活四": 1 },
+            "score": 10000
+        },
+        {
+            "patternNames": { "冲四": 2 },
+            "score": 10000
+        },
+        {
+            "patternNames": { "冲四": 1, "活三": 1 },
+            "score": 10000
+        },
+        {
+            "patternNames": { "冲四": 1 },
+            "score": 8000
+        },
+        {
+            "patternNames": { "活三": 2 },
+            "score": 5000
+        },
+        {
+            "patternNames": { "活三": 1, "眠三": 1 },
+            "score": 1000
+        },
+        {
+            "patternNames": { "活三": 1 },
+            "score": 200
+        },
+        {
+            "patternNames": { "活二": 2 },
+            "score": 100
+        },
+        {
+            "patternNames": { "眠三": 1 },
+            "score": 50
+        },
+        {
+            "patternNames": { "活二": 1, "眠二": 1 },
+            "score": 10
+        },
+        {
+            "patternNames": { "活二": 1 },
+            "score": 5
+        },
+        {
+            "patternNames": { "眠二": 1 },
+            "score": 3
+        },
+    ];
+    console.log(alternativeScore);
+    function countPatternNames(patterNames) {
+        var count = {};
+        for (var i = 0; i < patterNames.length; i++) {
+            var name = patterNames[i];
+            if (count[name] == undefined) {
+                count[name] = 0;
+            }
+            count[name] += 1;
+        }
+        return count;
+    }
+    function isPatternSubset(subsetPatterns, parentPatterns) {
+        for (var name in subsetPatterns) {
+            if (parentPatterns[name] == undefined || parentPatterns[name] < subsetPatterns[name]) {
+                return false;
+            }
+        }
+        return true;
+    }
+    function alternativePatternsToScore(patternNames) {
+        var count = countPatternNames(patternNames);
+        for (var i = 0; i < alternativeScore.length; i++) {
+            if (isPatternSubset(alternativeScore[i].patternNames, count)) {
+                return alternativeScore[i].score;
+            }
+        }
+        return 0;
+    }
+    GobangOnline.alternativePatternsToScore = alternativePatternsToScore;
 })(GobangOnline || (GobangOnline = {}));
 var GobangOnline;
 (function (GobangOnline) {
@@ -434,6 +531,7 @@ var GobangOnline;
             this.children = {};
             this.score = 0;
             this.rivalScore = 0;
+            this.name = null;
         }
         return Node;
     })();
@@ -454,6 +552,7 @@ var GobangOnline;
                 if (k == pattern.length - 1) {
                     node.score = patternData.score;
                     node.rivalScore = patternData.rivalScore;
+                    node.name = patternData.name;
                 }
             }
             node = GobangOnline.root;
@@ -466,6 +565,7 @@ var GobangOnline;
                 if (k == 0) {
                     node.score = patternData.score;
                     node.rivalScore = patternData.rivalScore;
+                    node.name = patternData.name;
                 }
             }
         }
@@ -516,17 +616,74 @@ var GobangOnline;
         return heuristics;
     }
     GobangOnline.computeHeuristicAt = computeHeuristicAt;
-    function computeHeuristicOfBoard(playerColor, board) {
+    function computeHeuristicOfBoardOld(playerColor, board) {
         var heuristics = 0;
         var heuristicsRival = 0;
+        var h = [];
+        var hr = [];
         for (var i = 0; i < board.size; i++) {
             for (var j = 0; j < board.size; j++) {
                 var m = { row: i, column: j };
-                heuristics = Math.max(heuristics, computeHeuristicAt(playerColor, m, board, false));
-                heuristicsRival = Math.max(heuristicsRival, computeHeuristicAt(playerColor, m, board, true));
+                heuristics += computeHeuristicAt(playerColor, m, board, false);
+                heuristicsRival += computeHeuristicAt(playerColor, m, board, true);
             }
         }
         return heuristics - heuristicsRival;
+    }
+    GobangOnline.computeHeuristicOfBoardOld = computeHeuristicOfBoardOld;
+    function matchPatternsAt(playerColor, move, board, searched) {
+        var patternNames = [];
+        var directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+        for (var i = 0; i < directions.length; i++) {
+            var node = GobangOnline.root;
+            var dx = directions[i][0];
+            var dy = directions[i][1];
+            var edgetPatternName = null;
+            var j = 0;
+            while (true) {
+                var m = { row: move.row + dy * j, column: move.column + dx * j };
+                if (board.isOutOfBound(m)) {
+                    break;
+                }
+                var ownership = color2ownership(board.colorAt(m), playerColor);
+                if (node.children[ownership]) {
+                    node = node.children[ownership];
+                    if (node.name) {
+                        edgetPatternName = node.name;
+                        for (var k = 0; k <= j; k++) {
+                            searched[move.row + dy * k][move.column + dx * k] = true;
+                        }
+                    }
+                }
+                else {
+                    break;
+                }
+                if (edgetPatternName) {
+                    patternNames.push(node.name);
+                }
+                j++;
+            }
+        }
+        return patternNames;
+    }
+    GobangOnline.matchPatternsAt = matchPatternsAt;
+    function computeHeuristicOfBoard(playerColor, board) {
+        var playerPatterns = [];
+        var opponentPatterns = [];
+        var searched = GobangOnline.buildSquareMatrix(board.size, false);
+        var searchedOpponent = GobangOnline.buildSquareMatrix(board.size, false);
+        for (var i = 0; i < board.size; i++) {
+            for (var j = 0; j < board.size; j++) {
+                var m = { row: i, column: j };
+                if (!searched[i][j]) {
+                    playerPatterns = playerPatterns.concat(this.matchPatternsAt(playerColor, m, board, searched));
+                }
+                if (!searchedOpponent[i][j]) {
+                    opponentPatterns = opponentPatterns.concat(this.matchPatternsAt(GobangOnline.getOpponentColor(playerColor), m, board, searchedOpponent));
+                }
+            }
+        }
+        return GobangOnline.alternativePatternsToScore(playerPatterns) - GobangOnline.alternativePatternsToScore(opponentPatterns) * 1.251;
     }
     GobangOnline.computeHeuristicOfBoard = computeHeuristicOfBoard;
 })(GobangOnline || (GobangOnline = {}));
@@ -544,44 +701,86 @@ var GobangOnline;
         AiPlayer.prototype.takeTurn = function (context, lastMove) {
             var v = this.alphabeta(context.board, this.depth, -Infinity, Infinity, true);
             console.log(v, this.maximizingMove);
+            console.log('end turn');
             context.registerMove(this, this.maximizingMove);
         };
-        AiPlayer.prototype.alphabeta = function (node, depth, alpha, beta, maximizingPlayer) {
-            if (depth == 0) {
+        AiPlayer.prototype.minimax = function (node, depth, maximizingPlayer) {
+            if (node.isGameOver(GobangOnline.getOpponentColor(this.color)))
+                return -Infinity;
+            if (node.isGameOver(this.color))
+                return Infinity;
+            if (depth == 0)
                 return GobangOnline.computeHeuristicOfBoard(this.color, node);
-            }
             if (maximizingPlayer) {
+                var moves = this.getTopCandidates(node, this.maxCandidates, true);
                 var v = -Infinity;
+                for (var i = 0; i < moves.length; i++) {
+                    var m = moves[i];
+                    node.setColorAt(m, this.color);
+                    var v1 = this.minimax(node, depth - 1, !maximizingPlayer);
+                    if (depth == this.depth) {
+                        console.log(v1, m);
+                    }
+                    if (depth == this.depth && v1 > v) {
+                        this.maximizingMove = m;
+                    }
+                    v = Math.max(v, v1);
+                    node.revertLastMove();
+                }
+                return v;
+            }
+            else {
+                var moves = this.getTopCandidates(node, this.maxCandidates, false);
+                var v = Infinity;
+                for (var i = 0; i < moves.length; i++) {
+                    var m = moves[i];
+                    node.setColorAt(m, GobangOnline.getOpponentColor(this.color));
+                    v = Math.min(v, this.minimax(node, depth - 1, !maximizingPlayer));
+                    node.revertLastMove();
+                }
+                return v;
+            }
+        };
+        AiPlayer.prototype.alphabeta = function (node, depth, alpha, beta, maximizingPlayer) {
+            if (node.isGameOver(GobangOnline.getOpponentColor(this.color)))
+                return -Infinity;
+            if (node.isGameOver(this.color))
+                return Infinity;
+            if (depth == 0)
+                return GobangOnline.computeHeuristicOfBoard(this.color, node);
+            if (maximizingPlayer) {
+                var v = alpha;
                 var maximizingMove;
                 var moves = this.getTopCandidates(node, this.maxCandidates, true);
                 for (var i = 0; i < moves.length; i++) {
                     var m = moves[i];
                     node.setColorAt(m, this.color);
-                    var tmp = this.alphabeta(node, depth - 1, alpha, beta, !maximizingPlayer);
+                    var tmp = this.alphabeta(node, depth - 1, v, beta, !maximizingPlayer);
+                    if (depth == this.depth) {
+                        console.log(tmp, m);
+                    }
                     if (depth == this.depth && tmp > v) {
                         this.maximizingMove = m;
                     }
                     v = Math.max(v, tmp);
                     node.revertLastMove();
-                    alpha = Math.max(alpha, v);
-                    if (beta <= alpha) {
-                        break;
+                    if (beta <= v) {
+                        return v;
                     }
                 }
                 return v;
             }
             else {
-                var v = Infinity;
+                var v = beta;
                 var moves = this.getTopCandidates(node, this.maxCandidates, false);
                 for (var i = 0; i < moves.length; i++) {
                     var m = moves[i];
                     node.setColorAt(m, GobangOnline.getOpponentColor(this.color));
-                    var tmp = this.alphabeta(node, depth - 1, alpha, beta, !maximizingPlayer);
+                    var tmp = this.alphabeta(node, depth - 1, alpha, v, !maximizingPlayer);
                     v = Math.min(v, tmp);
                     node.revertLastMove();
-                    beta = Math.min(beta, v);
-                    if (beta <= alpha) {
-                        break;
+                    if (v <= alpha) {
+                        return v;
                     }
                 }
                 return v;
@@ -589,6 +788,8 @@ var GobangOnline;
         };
         AiPlayer.prototype.getTopCandidates = function (board, maxCandidates, maximizingPlayer) {
             var candidates = this.getCandidates(board);
+            if (candidates.length <= maxCandidates)
+                return candidates;
             var candidateHeuristics = [];
             for (var i = 0; i < candidates.length; i++) {
                 var move = candidates[i];
@@ -640,11 +841,11 @@ var GobangOnline;
         API_KEY: 'swe48rh5c9l1h5mi',
         ROOMID: 'server',
         BOARD_SIZE: 19,
-        MAX_WAIT_PER_MOVE: 10,
         BOARD_X_START: 128 - 9,
         BOARD_Y_START: 26 - 9,
         BOARD_X_END: 689 - 9,
         BOARD_Y_END: 590 - 9,
+        MAX_SECONDS_PER_GAME: 300,
     };
 })(GobangOnline || (GobangOnline = {}));
 var GobangOnline;
@@ -655,11 +856,13 @@ var GobangOnline;
             _super.apply(this, arguments);
             this.worldScale = 1;
         }
-        SinglePlayer.prototype.init = function (aiDepth) {
+        SinglePlayer.prototype.init = function (aiDepth, maxCandidates) {
             this.aiDepth = aiDepth;
+            this.maxCandidates = maxCandidates;
         };
         SinglePlayer.prototype.create = function () {
             var _this = this;
+            this.click = this.add.audio('click');
             this.stageGroup = this.game.add.group();
             this.board = this.add.sprite(this.game.width / 2, this.game.height / 2, 'board');
             this.stageGroup.add(this.board);
@@ -675,7 +878,7 @@ var GobangOnline;
                 var msg = _this.game.add.bitmapText(_this.game.width / 2, _this.game.height / 2, 'Castaway', 'YOU LOST!');
                 msg.anchor.setTo(0.5, 0.5);
             };
-            this.aiPlayer = new GobangOnline.AiPlayer(this.aiDepth, 100);
+            this.aiPlayer = new GobangOnline.AiPlayer(this.aiDepth, this.maxCandidates);
             this.engine = new GobangOnline.Gobang(GobangOnline.Settings.BOARD_SIZE, this.humanPlayer, this.aiPlayer);
             this.engine.setOnRegisterMove(function (player, move) {
                 var pos = _this.move2position(move);
@@ -686,6 +889,7 @@ var GobangOnline;
                 piece.anchor.setTo(0.5, 0.5);
                 piece.scale.setTo(30 / piece.width);
                 _this.stageGroup.add(piece);
+                _this.click.play();
             });
             this.engine.startGame();
         };
@@ -758,6 +962,7 @@ var GobangOnline;
         MsgType[MsgType["GameOver"] = 2] = "GameOver";
         MsgType[MsgType["NewPlayer"] = 3] = "NewPlayer";
         MsgType[MsgType["PopupText"] = 4] = "PopupText";
+        MsgType[MsgType["Timer"] = 5] = "Timer";
     })(GobangOnline.MsgType || (GobangOnline.MsgType = {}));
     var MsgType = GobangOnline.MsgType;
     ;
@@ -767,6 +972,7 @@ var GobangOnline;
     var RemotePlayer = (function () {
         function RemotePlayer(conn) {
             this.conn = conn;
+            this.milliSecLeft = GobangOnline.Settings.MAX_SECONDS_PER_GAME * 1000;
         }
         RemotePlayer.prototype.send = function (msg) {
             this.conn.send(msg);
@@ -777,10 +983,15 @@ var GobangOnline;
         RemotePlayer.prototype.takeTurn = function (context, lastMove) {
             this.context = context;
             this.conn.send({ type: GobangOnline.MsgType.TakeTurn, lastMove: lastMove });
-            this.onTakeTurnCallback(this.context.board.getMoveCount());
+            this.onTakeTurnCallback(this.context.board.getMoveCount(), this.milliSecLeft);
+            this.turnBeganAt = new Date().getTime();
         };
         RemotePlayer.prototype.makeMove = function (move) {
             this.context.registerMove(this, move);
+            this.milliSecLeft -= new Date().getTime() - this.turnBeganAt;
+        };
+        RemotePlayer.prototype.getSecondsLeft = function () {
+            return Math.ceil(this.milliSecLeft / 1000);
         };
         RemotePlayer.prototype.badMove = function (context, badMove) {
         };
@@ -801,12 +1012,19 @@ var GobangOnline;
             this.takingTurn = false;
         }
         MultiPlayer.prototype.create = function () {
+            this.click = this.add.audio('click');
+            this.beep = this.add.audio('beep');
             this.board = this.add.sprite(this.game.width / 2, this.game.height / 2, 'board');
             this.board.anchor.setTo(0.5, 0.5);
             var scale = this.game.height / this.board.height;
             this.board.scale.setTo(scale, scale);
             this.createServerIfNotExist();
             this.localBoard = new GobangOnline.Board(GobangOnline.Settings.BOARD_SIZE);
+            var style = { font: "bold 32px Arial", fill: "#fff", boundsAlignH: "center", boundsAlignV: "middle" };
+            this.timer1 = this.add.text(this.game.width - 25, 0, GobangOnline.Settings.MAX_SECONDS_PER_GAME.toString(), style);
+            this.timer1.anchor.setTo(1, 0);
+            this.timer2 = this.add.text(this.game.width - 25, 30, GobangOnline.Settings.MAX_SECONDS_PER_GAME.toString(), style);
+            this.timer2.anchor.setTo(1, 0);
         };
         MultiPlayer.prototype.createServerIfNotExist = function () {
             var _this = this;
@@ -834,19 +1052,21 @@ var GobangOnline;
                             _this.engine = new GobangOnline.Gobang(GobangOnline.Settings.BOARD_SIZE, _this.remotePlayer1, _this.remotePlayer2);
                             _this.engine.blackPlayer.send({ type: GobangOnline.MsgType.PopupText, text: 'GAME BEGAN\nYOU ARE BLACK' });
                             _this.engine.whitePlayer.send({ type: GobangOnline.MsgType.PopupText, text: 'GAME BEGAN\nYOU ARE WHITE' });
-                            _this.engine.blackPlayer.onTakeTurnCallback = function (moveCountBeforeTurn) {
+                            _this.engine.blackPlayer.onTakeTurnCallback = function (moveCountBeforeTurn, milliSecLeft) {
+                                _this.broadCast({ type: GobangOnline.MsgType.Timer, milliSecLeft: milliSecLeft, color: GobangOnline.Color.Black });
                                 setTimeout(function () {
                                     if (moveCountBeforeTurn == _this.engine.board.getMoveCount()) {
                                         _this.declareWinner(GobangOnline.Color.White);
                                     }
-                                }, (GobangOnline.Settings.MAX_WAIT_PER_MOVE + 1) * 1000);
+                                }, milliSecLeft + 1000);
                             };
-                            _this.engine.whitePlayer.onTakeTurnCallback = function (moveCountBeforeTurn) {
+                            _this.engine.whitePlayer.onTakeTurnCallback = function (moveCountBeforeTurn, milliSecLeft) {
+                                _this.broadCast({ type: GobangOnline.MsgType.Timer, milliSecLeft: milliSecLeft, color: GobangOnline.Color.White });
                                 setTimeout(function () {
                                     if (moveCountBeforeTurn == _this.engine.board.getMoveCount()) {
                                         _this.declareWinner(GobangOnline.Color.Black);
                                     }
-                                }, (GobangOnline.Settings.MAX_WAIT_PER_MOVE + 1) * 1000);
+                                }, milliSecLeft + 1000);
                             };
                             _this.engine.startGame();
                             _this.engine.onGameOver = function () {
@@ -927,12 +1147,19 @@ var GobangOnline;
             this.connToServer.on('data', function (data) {
                 console.log('client got message: ', data);
                 switch (data.type) {
+                    case GobangOnline.MsgType.Timer:
+                        _this.turnBeganAt = (new Date()).getTime();
+                        if (data.color == GobangOnline.Color.Black) {
+                            _this.milliSecLeft1 = data.milliSecLeft;
+                            _this.milliSecLeft2 = null;
+                        }
+                        else {
+                            _this.milliSecLeft2 = data.milliSecLeft;
+                            _this.milliSecLeft1 = null;
+                        }
+                        break;
                     case GobangOnline.MsgType.TakeTurn:
                         _this.takingTurn = true;
-                        _this.turnBeganAt = (new Date()).getTime();
-                        var style = { font: "bold 32px Arial", fill: "#fff", boundsAlignH: "center", boundsAlignV: "middle" };
-                        _this.timer = _this.add.text(_this.game.width - 25, 0, GobangOnline.Settings.MAX_WAIT_PER_MOVE.toString(), style);
-                        _this.timer.anchor.setTo(1, 0);
                         break;
                     case GobangOnline.MsgType.Move:
                         var move = data.move;
@@ -950,6 +1177,7 @@ var GobangOnline;
                         else {
                             _this.localBoard.setColorAt(move, GobangOnline.Color.White);
                         }
+                        _this.click.play();
                         break;
                     case GobangOnline.MsgType.GameOver:
                         var txt = data.winnerColor == GobangOnline.Color.Black ? 'BLACK WINS' : 'WHITE WINS';
@@ -965,10 +1193,22 @@ var GobangOnline;
             });
         };
         MultiPlayer.prototype.update = function () {
+            if (this.milliSecLeft1) {
+                var secondsLeft = Math.max(0, Math.ceil((this.milliSecLeft1 - (new Date().getTime() - this.turnBeganAt)) / 1000));
+                if (secondsLeft != parseInt(this.timer1.text) && secondsLeft < 30) {
+                    this.beep.play();
+                }
+                this.timer1.setText(secondsLeft.toString());
+            }
+            if (this.milliSecLeft2) {
+                var secondsLeft = Math.max(0, Math.ceil((this.milliSecLeft2 - (new Date().getTime() - this.turnBeganAt)) / 1000));
+                if (secondsLeft != parseInt(this.timer2.text) && secondsLeft < 30) {
+                    this.beep.play();
+                }
+                this.timer2.setText(secondsLeft.toString());
+            }
             if (this.takingTurn) {
                 var move = this.position2move(this.game.input.activePointer);
-                var secondsLeft = Math.max(0, GobangOnline.Settings.MAX_WAIT_PER_MOVE - Math.floor((new Date().getTime() - this.turnBeganAt) / 1000));
-                this.timer.setText(secondsLeft.toString());
                 if (this.game.input.activePointer.isDown) {
                     if (this.localBoard.isMoveValid(move) && !this.pendingMove) {
                         this.pendingMove = move;
@@ -981,10 +1221,6 @@ var GobangOnline;
                     }
                     this.pendingMove = null;
                 }
-            }
-            else if (this.timer) {
-                this.timer.destroy();
-                this.timer = null;
             }
         };
         MultiPlayer.prototype.move2position = function (move) {
