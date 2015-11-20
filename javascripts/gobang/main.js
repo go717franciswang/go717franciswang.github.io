@@ -38,8 +38,8 @@ var GobangOnline;
             this.load.image('board', '/resources/gobang/board.png');
             this.load.spritesheet('piece', '/resources/gobang/pieces.png', 100, 100, 2);
             this.load.bitmapFont('Castaway', '/resources/gobang/fonts/Castaway.png', '/resources/gobang/fonts/Castaway.xml');
-            this.load.audio('click', 'resources/gobang/click.mp3');
-            this.load.audio('beep', 'resources/gobang/beep.mp3');
+            this.load.audio('click', '/resources/gobang/click.mp3');
+            this.load.audio('beep', '/resources/gobang/beep.mp3');
             this.stage.smoothed = false;
         };
         Preloader.prototype.create = function () {
@@ -64,6 +64,12 @@ var GobangOnline;
         return group;
     }
     GobangOnline.addButton = addButton;
+    function addMenuButton(game) {
+        addButton(game, game.width / 2, game.height / 2 + 150, 'MENU', function () {
+            game.state.start('MainMenu', true, false, 3, 50);
+        });
+    }
+    GobangOnline.addMenuButton = addMenuButton;
 })(GobangOnline || (GobangOnline = {}));
 var GobangOnline;
 (function (GobangOnline) {
@@ -142,6 +148,20 @@ var GobangOnline;
         return matrix;
     }
     GobangOnline.buildSquareMatrix = buildSquareMatrix;
+    function move2position(move) {
+        return {
+            x: move.column * (GobangOnline.Settings.BOARD_X_END - GobangOnline.Settings.BOARD_X_START) / (GobangOnline.Settings.BOARD_SIZE - 1) + GobangOnline.Settings.BOARD_X_START,
+            y: move.row * (GobangOnline.Settings.BOARD_Y_END - GobangOnline.Settings.BOARD_Y_START) / (GobangOnline.Settings.BOARD_SIZE - 1) + GobangOnline.Settings.BOARD_Y_START
+        };
+    }
+    GobangOnline.move2position = move2position;
+    function position2move(position) {
+        return {
+            row: Math.round((position.y - GobangOnline.Settings.BOARD_Y_START) / ((GobangOnline.Settings.BOARD_Y_END - GobangOnline.Settings.BOARD_Y_START) / (GobangOnline.Settings.BOARD_SIZE - 1))),
+            column: Math.round((position.x - GobangOnline.Settings.BOARD_X_START) / ((GobangOnline.Settings.BOARD_X_END - GobangOnline.Settings.BOARD_X_START) / (GobangOnline.Settings.BOARD_SIZE - 1)))
+        };
+    }
+    GobangOnline.position2move = position2move;
     var Board = (function () {
         function Board(size) {
             this.size = size;
@@ -299,6 +319,9 @@ var GobangOnline;
                 return;
             }
             this.board.setColorAt(move, player.color);
+            if (this.onRegisterMove) {
+                this.onRegisterMove(player, move);
+            }
             if (this.isGameOver(player)) {
                 this.gameOver = true;
                 player.win();
@@ -310,9 +333,6 @@ var GobangOnline;
             }
             this.swapPlayingPendingState();
             this.pendingPlayer.takeTurn(this, move);
-            if (this.onRegisterMove) {
-                this.onRegisterMove(player, move);
-            }
         };
         Gobang.prototype.swapPlayingPendingState = function () {
             var tmp = this.pendingPlayer;
@@ -461,7 +481,7 @@ var GobangOnline;
         },
         {
             "patternNames": { "活三": 1 },
-            "score": 200
+            "score": 800
         },
         {
             "patternNames": { "活二": 2 },
@@ -689,6 +709,12 @@ var GobangOnline;
 })(GobangOnline || (GobangOnline = {}));
 var GobangOnline;
 (function (GobangOnline) {
+    (function (Algo) {
+        Algo[Algo["Minimax"] = 0] = "Minimax";
+        Algo[Algo["Alphabeta"] = 1] = "Alphabeta";
+    })(GobangOnline.Algo || (GobangOnline.Algo = {}));
+    var Algo = GobangOnline.Algo;
+    ;
     var AiPlayer = (function () {
         function AiPlayer(depth, maxCandidates) {
             this.depth = depth;
@@ -699,12 +725,37 @@ var GobangOnline;
             this.color = color;
         };
         AiPlayer.prototype.takeTurn = function (context, lastMove) {
-            var v = this.alphabeta(context.board, this.depth, -Infinity, Infinity, true);
-            console.log(v, this.maximizingMove);
+            this.solver = new Solver(this.color, this.depth, this.maxCandidates, Algo.Alphabeta);
+            var maximizingMove = this.solver.solve(context.board);
+            console.log(maximizingMove);
             console.log('end turn');
-            context.registerMove(this, this.maximizingMove);
+            context.registerMove(this, maximizingMove);
         };
-        AiPlayer.prototype.minimax = function (node, depth, maximizingPlayer) {
+        AiPlayer.prototype.badMove = function (context, badMove) {
+        };
+        AiPlayer.prototype.win = function () {
+        };
+        AiPlayer.prototype.lose = function () {
+        };
+        return AiPlayer;
+    })();
+    GobangOnline.AiPlayer = AiPlayer;
+    var Solver = (function () {
+        function Solver(color, depth, maxCandidates, algo) {
+            this.color = color;
+            this.depth = depth;
+            this.maxCandidates = maxCandidates;
+            this.algo = algo;
+        }
+        Solver.prototype.solve = function (node) {
+            this.maximizingMove = null;
+            if (this.algo == Algo.Minimax)
+                this.minimax(node, this.depth, true);
+            else if (this.algo == Algo.Alphabeta)
+                this.alphabeta(node, this.depth, -Infinity, Infinity, true);
+            return this.maximizingMove;
+        };
+        Solver.prototype.minimax = function (node, depth, maximizingPlayer) {
             if (node.isGameOver(GobangOnline.getOpponentColor(this.color)))
                 return -Infinity;
             if (node.isGameOver(this.color))
@@ -741,7 +792,7 @@ var GobangOnline;
                 return v;
             }
         };
-        AiPlayer.prototype.alphabeta = function (node, depth, alpha, beta, maximizingPlayer) {
+        Solver.prototype.alphabeta = function (node, depth, alpha, beta, maximizingPlayer) {
             if (node.isGameOver(GobangOnline.getOpponentColor(this.color)))
                 return -Infinity;
             if (node.isGameOver(this.color))
@@ -786,7 +837,7 @@ var GobangOnline;
                 return v;
             }
         };
-        AiPlayer.prototype.getTopCandidates = function (board, maxCandidates, maximizingPlayer) {
+        Solver.prototype.getTopCandidates = function (board, maxCandidates, maximizingPlayer) {
             var candidates = this.getCandidates(board);
             if (candidates.length <= maxCandidates)
                 return candidates;
@@ -809,7 +860,7 @@ var GobangOnline;
             }
             return topCandidates;
         };
-        AiPlayer.prototype.getCandidates = function (board) {
+        Solver.prototype.getCandidates = function (board) {
             var candidates = [];
             for (var i = 0; i < board.size; i++) {
                 for (var j = 0; j < board.size; j++) {
@@ -825,15 +876,9 @@ var GobangOnline;
             }
             return candidates;
         };
-        AiPlayer.prototype.badMove = function (context, badMove) {
-        };
-        AiPlayer.prototype.win = function () {
-        };
-        AiPlayer.prototype.lose = function () {
-        };
-        return AiPlayer;
+        return Solver;
     })();
-    GobangOnline.AiPlayer = AiPlayer;
+    GobangOnline.Solver = Solver;
 })(GobangOnline || (GobangOnline = {}));
 var GobangOnline;
 (function (GobangOnline) {
@@ -854,7 +899,6 @@ var GobangOnline;
         __extends(SinglePlayer, _super);
         function SinglePlayer() {
             _super.apply(this, arguments);
-            this.worldScale = 1;
         }
         SinglePlayer.prototype.init = function (aiDepth, maxCandidates) {
             this.aiDepth = aiDepth;
@@ -863,9 +907,7 @@ var GobangOnline;
         SinglePlayer.prototype.create = function () {
             var _this = this;
             this.click = this.add.audio('click');
-            this.stageGroup = this.game.add.group();
             this.board = this.add.sprite(this.game.width / 2, this.game.height / 2, 'board');
-            this.stageGroup.add(this.board);
             this.board.anchor.setTo(0.5, 0.5);
             var scale = this.game.height / this.board.height;
             this.board.scale.setTo(scale, scale);
@@ -873,70 +915,30 @@ var GobangOnline;
             this.humanPlayer.onWinCallback = function () {
                 var msg = _this.game.add.bitmapText(_this.game.width / 2, _this.game.height / 2, 'Castaway', 'YOU WON!');
                 msg.anchor.setTo(0.5, 0.5);
+                GobangOnline.addMenuButton(_this.game);
             };
             this.humanPlayer.onLossCallback = function () {
                 var msg = _this.game.add.bitmapText(_this.game.width / 2, _this.game.height / 2, 'Castaway', 'YOU LOST!');
                 msg.anchor.setTo(0.5, 0.5);
+                GobangOnline.addMenuButton(_this.game);
             };
             this.aiPlayer = new GobangOnline.AiPlayer(this.aiDepth, this.maxCandidates);
             this.engine = new GobangOnline.Gobang(GobangOnline.Settings.BOARD_SIZE, this.humanPlayer, this.aiPlayer);
             this.engine.setOnRegisterMove(function (player, move) {
-                var pos = _this.move2position(move);
+                var pos = GobangOnline.move2position(move);
                 var piece = _this.add.sprite(pos.x, pos.y, 'piece');
                 if (player.color == GobangOnline.Color.White) {
                     piece.frame = 1;
                 }
                 piece.anchor.setTo(0.5, 0.5);
                 piece.scale.setTo(30 / piece.width);
-                _this.stageGroup.add(piece);
                 _this.click.play();
             });
             this.engine.startGame();
         };
-        SinglePlayer.prototype.move2position = function (move) {
-            return {
-                x: move.column * (GobangOnline.Settings.BOARD_X_END - GobangOnline.Settings.BOARD_X_START) / (GobangOnline.Settings.BOARD_SIZE - 1) + GobangOnline.Settings.BOARD_X_START,
-                y: move.row * (GobangOnline.Settings.BOARD_Y_END - GobangOnline.Settings.BOARD_Y_START) / (GobangOnline.Settings.BOARD_SIZE - 1) + GobangOnline.Settings.BOARD_Y_START
-            };
-        };
-        SinglePlayer.prototype.position2move = function (position) {
-            return {
-                row: Math.round((position.y - GobangOnline.Settings.BOARD_Y_START) / ((GobangOnline.Settings.BOARD_Y_END - GobangOnline.Settings.BOARD_Y_START) / (GobangOnline.Settings.BOARD_SIZE - 1))),
-                column: Math.round((position.x - GobangOnline.Settings.BOARD_X_START) / ((GobangOnline.Settings.BOARD_X_END - GobangOnline.Settings.BOARD_X_START) / (GobangOnline.Settings.BOARD_SIZE - 1)))
-            };
-        };
         SinglePlayer.prototype.update = function () {
-            if (this.input.pointer1.isDown && this.input.pointer2.isDown) {
-                this.oldCenter = this.center;
-                this.center = { x: (this.input.pointer1.x + this.input.pointer2.x) / 2, y: (this.input.pointer1.y + this.input.pointer2.y) / 2 };
-                this.oldDistance = this.distance;
-                this.distance = Phaser.Math.distance(this.input.pointer1.x, this.input.pointer1.y, this.input.pointer2.x, this.input.pointer2.y);
-                var delta = Math.abs(this.oldDistance - this.distance);
-                if (delta > 4) {
-                    if (this.oldDistance < this.distance) {
-                        this.worldScale -= 0.02;
-                    }
-                    else {
-                        this.worldScale += 0.02;
-                    }
-                    this.worldScale = Phaser.Math.clamp(this.worldScale, 0.5, 1.5);
-                    this.stageGroup.scale.set(this.worldScale);
-                }
-                else {
-                    if (Math.abs(this.center.x - this.oldCenter.x) > 4) {
-                        if (this.center.x > this.oldCenter.x) {
-                            this.camera.x += 4;
-                        }
-                    }
-                    if (Math.abs(this.center.y - this.oldCenter.y) > 4) {
-                        if (this.center.y > this.oldCenter.y) {
-                            this.camera.y += 4;
-                        }
-                    }
-                }
-            }
-            else if (this.humanPlayer.takingTurn) {
-                var move = this.position2move(this.game.input.activePointer);
+            if (this.humanPlayer.takingTurn) {
+                var move = GobangOnline.position2move(this.game.input.activePointer);
                 if (this.game.input.activePointer.isDown) {
                     if (this.engine.board.isMoveValid(move) && !this.pendingMove) {
                         this.pendingMove = move;
@@ -1163,7 +1165,7 @@ var GobangOnline;
                         break;
                     case GobangOnline.MsgType.Move:
                         var move = data.move;
-                        var pos = _this.move2position(move);
+                        var pos = GobangOnline.move2position(move);
                         var piece = _this.add.sprite(pos.x, pos.y, 'piece');
                         var blackTurn = data.moveId % 2 == 0;
                         if (!blackTurn) {
@@ -1183,6 +1185,7 @@ var GobangOnline;
                         var txt = data.winnerColor == GobangOnline.Color.Black ? 'BLACK WINS' : 'WHITE WINS';
                         var msg = _this.game.add.bitmapText(_this.game.width / 2, _this.game.height / 2, 'Castaway', txt);
                         msg.anchor.setTo(0.5, 0.5);
+                        GobangOnline.addMenuButton(_this.game);
                         break;
                     case GobangOnline.MsgType.PopupText:
                         var msg = _this.game.add.bitmapText(_this.game.width / 2, _this.game.height / 2, 'Castaway', data.text);
@@ -1208,7 +1211,7 @@ var GobangOnline;
                 this.timer2.setText(secondsLeft.toString());
             }
             if (this.takingTurn) {
-                var move = this.position2move(this.game.input.activePointer);
+                var move = GobangOnline.position2move(this.game.input.activePointer);
                 if (this.game.input.activePointer.isDown) {
                     if (this.localBoard.isMoveValid(move) && !this.pendingMove) {
                         this.pendingMove = move;
@@ -1222,18 +1225,6 @@ var GobangOnline;
                     this.pendingMove = null;
                 }
             }
-        };
-        MultiPlayer.prototype.move2position = function (move) {
-            return {
-                x: move.column * (GobangOnline.Settings.BOARD_X_END - GobangOnline.Settings.BOARD_X_START) / (GobangOnline.Settings.BOARD_SIZE - 1) + GobangOnline.Settings.BOARD_X_START,
-                y: move.row * (GobangOnline.Settings.BOARD_Y_END - GobangOnline.Settings.BOARD_Y_START) / (GobangOnline.Settings.BOARD_SIZE - 1) + GobangOnline.Settings.BOARD_Y_START
-            };
-        };
-        MultiPlayer.prototype.position2move = function (position) {
-            return {
-                row: Math.round((position.y - GobangOnline.Settings.BOARD_Y_START) / ((GobangOnline.Settings.BOARD_Y_END - GobangOnline.Settings.BOARD_Y_START) / (GobangOnline.Settings.BOARD_SIZE - 1))),
-                column: Math.round((position.x - GobangOnline.Settings.BOARD_X_START) / ((GobangOnline.Settings.BOARD_X_END - GobangOnline.Settings.BOARD_X_START) / (GobangOnline.Settings.BOARD_SIZE - 1)))
-            };
         };
         return MultiPlayer;
     })(Phaser.State);
@@ -1260,3 +1251,109 @@ var GobangOnline;
 window.onload = function () {
     var game = new GobangOnline.Game();
 };
+var GobangOnline;
+(function (GobangOnline) {
+    function loadBoard(data) {
+        var size = data.length;
+        var board = new GobangOnline.Board(size);
+        var acceptableAnwsers = [];
+        for (var i = 0; i < size; i++) {
+            var row = data[i].trim();
+            for (var j = 0; j < size; j++) {
+                var m = { row: i, column: j };
+                if (row[j] == "x") {
+                    board.setColorAt(m, GobangOnline.Color.Black);
+                }
+                else if (row[j] == "o") {
+                    board.setColorAt(m, GobangOnline.Color.White);
+                }
+                else if (row[j] == "?") {
+                    acceptableAnwsers.push(m);
+                }
+            }
+        }
+        return { board: board, acceptableAnwsers: acceptableAnwsers };
+    }
+    function assertAcceptableAnser(answer, acceptableAnwsers, data, testTitle) {
+        for (var i = 0; i < acceptableAnwsers.length; i++) {
+            var validAnswer = acceptableAnwsers[i];
+            if (answer.row == validAnswer.row && answer.column == validAnswer.column) {
+                printBoard(answer, data);
+                console.log(testTitle + " passed");
+                return;
+            }
+        }
+        printBoard(answer, data);
+        throw "Assertion failed for " + testTitle + ": expected " + JSON.stringify(acceptableAnwsers) + ", got " + JSON.stringify(answer);
+    }
+    function printBoard(answer, data) {
+        for (var i = 0; i < data.length; i++) {
+            var id = "" + i + "|";
+            if (answer.row == i) {
+                var row = data[i].substr(0, answer.column) + "💻" + data[i].substr(answer.column + 1, data[i].length - answer.column - 1);
+                console.log(id + row);
+            }
+            else {
+                console.log(id + data[i]);
+            }
+        }
+    }
+    function test1() {
+        var data = [".......",
+            ".......",
+            ".o.o.?.",
+            "..oxx..",
+            ".xox...",
+            "..x....",
+            ".?....."];
+        var info = loadBoard(data);
+        var m1 = new GobangOnline.Solver(GobangOnline.Color.White, 1, 100, GobangOnline.Algo.Alphabeta).solve(info.board);
+        assertAcceptableAnser(m1, info.acceptableAnwsers, data, "Easy AI");
+        var m2 = new GobangOnline.Solver(GobangOnline.Color.White, 2, 100, GobangOnline.Algo.Alphabeta).solve(info.board);
+        assertAcceptableAnser(m2, info.acceptableAnwsers, data, "Intermediate AI");
+        var m3 = new GobangOnline.Solver(GobangOnline.Color.White, 3, 100, GobangOnline.Algo.Alphabeta).solve(info.board);
+        assertAcceptableAnser(m2, info.acceptableAnwsers, data, "Advanced AI");
+    }
+    GobangOnline.test1 = test1;
+    function test2() {
+        var data = [".......",
+            "..o.o.o",
+            "..oxxx.",
+            "..oox..",
+            "..?xx..",
+            "..xx?..",
+            ".o..?.."];
+        var info = loadBoard(data);
+        var m1 = new GobangOnline.Solver(GobangOnline.Color.White, 1, 100, GobangOnline.Algo.Alphabeta).solve(info.board);
+        assertAcceptableAnser(m1, info.acceptableAnwsers, data, "Easy AI");
+        var m2 = new GobangOnline.Solver(GobangOnline.Color.White, 2, 100, GobangOnline.Algo.Alphabeta).solve(info.board);
+        assertAcceptableAnser(m2, info.acceptableAnwsers, data, "Intermediate AI");
+        var m3 = new GobangOnline.Solver(GobangOnline.Color.White, 3, 100, GobangOnline.Algo.Alphabeta).solve(info.board);
+        assertAcceptableAnser(m2, info.acceptableAnwsers, data, "Advanced AI");
+    }
+    GobangOnline.test2 = test2;
+    function test3() {
+        var data = ["........",
+            "........",
+            "........",
+            "...x....",
+            "....x...",
+            "...?ooo?",
+            "......x.",
+            "........"];
+        var info = loadBoard(data);
+        var m1 = new GobangOnline.Solver(GobangOnline.Color.Black, 1, 100, GobangOnline.Algo.Alphabeta).solve(info.board);
+        assertAcceptableAnser(m1, info.acceptableAnwsers, data, "Easy AI");
+        var m2 = new GobangOnline.Solver(GobangOnline.Color.Black, 2, 100, GobangOnline.Algo.Alphabeta).solve(info.board);
+        assertAcceptableAnser(m2, info.acceptableAnwsers, data, "Intermediate AI");
+        var m3 = new GobangOnline.Solver(GobangOnline.Color.Black, 3, 100, GobangOnline.Algo.Alphabeta).solve(info.board);
+        assertAcceptableAnser(m2, info.acceptableAnwsers, data, "Advanced AI");
+    }
+    GobangOnline.test3 = test3;
+    function testAll() {
+        test1();
+        test2();
+        test3();
+    }
+    GobangOnline.testAll = testAll;
+})(GobangOnline || (GobangOnline = {}));
