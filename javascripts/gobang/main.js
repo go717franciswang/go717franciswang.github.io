@@ -38,8 +38,8 @@ var GobangOnline;
             this.load.image('board', '/resources/gobang/board.png');
             this.load.spritesheet('piece', '/resources/gobang/pieces.png', 100, 100, 2);
             this.load.bitmapFont('Castaway', '/resources/gobang/fonts/Castaway.png', '/resources/gobang/fonts/Castaway.xml');
-            this.load.audio('click', 'resources/gobang/click.mp3');
-            this.load.audio('beep', 'resources/gobang/beep.mp3');
+            this.load.audio('click', '/resources/gobang/click.mp3');
+            this.load.audio('beep', '/resources/gobang/beep.mp3');
             this.stage.smoothed = false;
         };
         Preloader.prototype.create = function () {
