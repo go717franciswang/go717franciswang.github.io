@@ -16,7 +16,7 @@ var GhostMansion;
         };
         Preloader.prototype.preload = function () {
             this.load.path = '/resources/ghost_mansion/';
-            this.load.tilemap('map', 'test.json?r=' + Math.random(), null, Phaser.Tilemap.TILED_JSON);
+            this.load.tilemap('map', this.setting.map + '?r=' + Math.random(), null, Phaser.Tilemap.TILED_JSON);
             this.load.image('tiles', 'biomechamorphs_001.png');
         };
         Preloader.prototype.create = function () {
@@ -345,7 +345,7 @@ var GhostMansion;
                         if (tile == null)
                             continue;
                         var tileId = this.tile2id(tile);
-                        if (prevTile[tileId] === undefined && tile.index != 404) {
+                        if (prevTile[tileId] === undefined && tile.index == -1) {
                             prevTile[tileId] = id;
                             newEdges.push(tile);
                         }
@@ -455,8 +455,16 @@ var GhostMansion;
             var dy = y - this.sprite.y;
             var dsq = dx * dx + dy * dy;
             var a = Math.atan2(dy, dx);
-            return a >= this.inputController.direction - this.rayWidth / 2 &&
-                a <= this.inputController.direction + this.rayWidth / 2 &&
+            // sometimes a (angle from human to ghost) and direction (angle that human is facing)
+            // need to be modded by 2 pi for cases like
+            // a = -1.46 and direction = 4.82
+            var angleDist = (a - this.inputController.direction) % (Math.PI * 2);
+            while (angleDist < 0)
+                angleDist += Math.PI * 2;
+            angleDist = Math.min(angleDist, Math.PI * 2 - angleDist);
+            console.log(angleDist);
+            return angleDist >= -this.rayWidth / 2 &&
+                angleDist <= this.rayWidth / 2 &&
                 dsq <= this.rayLength * this.rayLength;
         };
         FlashLight.prototype.turnOn = function () {
@@ -514,7 +522,7 @@ var GhostMansion;
             this.lives = 3;
         }
         Map1.prototype.init = function (setting) {
-            this.playerCount = setting.playerCount;
+            this.setting = setting;
         };
         Map1.prototype.create = function () {
             var _this = this;
@@ -525,11 +533,12 @@ var GhostMansion;
             this.boxPanicked = this.makeBox(0xffff00);
             this.map = this.add.tilemap('map');
             this.map.addTilesetImage('biomechamorphs_001', 'tiles');
-            this.map.setCollision(404, true, 'walls');
             var background = this.map.createLayer('background');
             this.walls = this.map.createLayer('walls');
+            this.collideWalls();
             background.resizeWorld();
-            this.walls.resizeWorld();
+            background.alpha = 0.3;
+            // this.walls.resizeWorld();
             this.controllables = this.add.group();
             this.addPlayer({
                 left: Phaser.KeyCode.LEFT,
@@ -538,7 +547,7 @@ var GhostMansion;
                 down: Phaser.KeyCode.DOWN,
                 flashlight: Phaser.KeyCode.ENTER
             });
-            if (this.playerCount == 2) {
+            if (this.setting.playerCount == 2) {
                 this.addPlayer({
                     left: Phaser.KeyCode.A,
                     right: Phaser.KeyCode.D,
@@ -563,6 +572,18 @@ var GhostMansion;
                 _this.gameOver();
             };
             this.ghost = ghost;
+        };
+        Map1.prototype.collideWalls = function () {
+            var _this = this;
+            var distinctTileIndexsObj = {};
+            this.map.forEach(function (tile) {
+                if (tile.index != -1 && tile.index != undefined)
+                    distinctTileIndexsObj[tile.index] = true;
+            }, this, 0, 0, this.map.width, this.map.height, this.walls);
+            var distinctTileIndexs = Object.keys(distinctTileIndexsObj);
+            distinctTileIndexs.forEach(function (index) {
+                _this.map.setCollision(parseInt(index), true, 'walls');
+            });
         };
         Map1.prototype.addPlayer = function (keyMap) {
             var _this = this;
@@ -705,14 +726,40 @@ var GhostMansion;
 /// <reference path="./common.ts"/>
 var GhostMansion;
 (function (GhostMansion) {
+    var MapSelection = (function (_super) {
+        __extends(MapSelection, _super);
+        function MapSelection() {
+            _super.apply(this, arguments);
+        }
+        MapSelection.prototype.init = function (setting) {
+            this.setting = setting;
+        };
+        MapSelection.prototype.create = function () {
+            GhostMansion.Common.addButton(this, this.world.centerX, this.world.centerY - 20, 'Main Floor', 'Preloader', this.selectMap('main-floor.json'));
+            GhostMansion.Common.addButton(this, this.world.centerX, this.world.centerY + 20, 'Research Lab', 'Preloader', this.selectMap('research-lab.json'));
+        };
+        MapSelection.prototype.selectMap = function (map) {
+            var clone = JSON.parse(JSON.stringify(this.setting));
+            clone.map = map;
+            return clone;
+        };
+        return MapSelection;
+    }(Phaser.State));
+    GhostMansion.MapSelection = MapSelection;
+})(GhostMansion || (GhostMansion = {}));
+/// <reference path="./phaser.d.ts"/>
+/// <reference path="./common.ts"/>
+/// <reference path="./map_selection.ts"/>
+var GhostMansion;
+(function (GhostMansion) {
     var LocalSelection = (function (_super) {
         __extends(LocalSelection, _super);
         function LocalSelection() {
             _super.apply(this, arguments);
         }
         LocalSelection.prototype.create = function () {
-            GhostMansion.Common.addButton(this, this.world.centerX, this.world.centerY - 20, '1 Player', 'Preloader', { playerCount: 1 });
-            GhostMansion.Common.addButton(this, this.world.centerX, this.world.centerY + 20, '2 Players', 'Preloader', { playerCount: 2 });
+            GhostMansion.Common.addButton(this, this.world.centerX, this.world.centerY - 20, '1 Player', 'MapSelection', { playerCount: 1 });
+            GhostMansion.Common.addButton(this, this.world.centerX, this.world.centerY + 20, '2 Players', 'MapSelection', { playerCount: 2 });
         };
         return LocalSelection;
     }(Phaser.State));
@@ -723,6 +770,7 @@ var GhostMansion;
 /// <reference path="./map1.ts"/>
 /// <reference path="./network_selection.ts"/>
 /// <reference path="./local_selection.ts"/>
+/// <reference path="./map_selection.ts"/>
 var GhostMansion;
 (function (GhostMansion) {
     function startGame() {
@@ -731,6 +779,7 @@ var GhostMansion;
         game.state.add('Map1', GhostMansion.Map1);
         game.state.add('NetworkSelection', GhostMansion.NetworkSelection);
         game.state.add('LocalSelection', GhostMansion.LocalSelection);
+        game.state.add('MapSelection', GhostMansion.MapSelection);
         game.state.start('NetworkSelection');
     }
     GhostMansion.startGame = startGame;
