@@ -38,7 +38,7 @@ If you don't have a power supply. Then purchase an 5V-4A power supply.
  root@Deepcam:/home/aws_cam# apt-get install python3.7-venv -y
  root@Deepcam:/home/aws_cam/OctoPrint# apt install python3.7-dev
  aws_cam@Deepcam:~$ mkdir OctoPrint && cd OctoPrint
- aws_cam@Deepcam:~/OctoPrint$ python3.8 -m venv venv
+ aws_cam@Deepcam:~/OctoPrint$ python3.7 -m venv venv
  aws_cam@Deepcam:~/OctoPrint$ source venv/bin/activate
  (venv) aws_cam@Deepcam:~/OctoPrint$ pip install pip --upgrade
  (venv) aws_cam@Deepcam:~/OctoPrint$ pip install octoprint
