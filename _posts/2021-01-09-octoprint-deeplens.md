@@ -77,6 +77,11 @@ Enable the service
 ```
  aws_cam@Deepcam:~$ sudo systemctl enable octoprint.service
  aws_cam@Deepcam:~$ sudo visudo  -f /etc/sudoers.d/octoprint-shutdown
+```
+
+Append
+
+```
  aws_cam ALL=NOPASSWD: /sbin/shutdown
  aws_cam ALL=NOPASSWD: /usr/sbin/service
 ```
